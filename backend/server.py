@@ -735,99 +735,99 @@ async def load_version(version_id: str):
     
     return {"message": "Version loaded successfully", "version": version}
 
-# GitHub Integration Endpoints
-class GitHubSetupRequest(BaseModel):
-    github_token: str
-    username: str
+# GitHub Integration Endpoints - DISABLED
+# class GitHubSetupRequest(BaseModel):
+#     github_token: str
+#     username: str
 
-@api_router.post("/github/setup")
-async def setup_github_integration(request: GitHubSetupRequest):
-    """Setup GitHub integration with user token"""
-    try:
-        global github_integration, github_config
-        github_config.github_token = request.github_token
-        github_integration = GitHubIntegration(request.github_token)
-        
-        success = await github_integration.initialize_repository(request.username)
-        if success:
-            return {"message": "GitHub integration setup successfully", "repository": f"{request.username}/tweet-tracker-backups"}
-        else:
-            return {"error": "Failed to setup GitHub integration"}
-    except Exception as e:
-        return {"error": str(e)}
+# @api_router.post("/github/setup")
+# async def setup_github_integration(request: GitHubSetupRequest):
+#     """Setup GitHub integration with user token"""
+#     try:
+#         global github_integration, github_config
+#         github_config.github_token = request.github_token
+#         github_integration = GitHubIntegration(request.github_token)
+#         
+#         success = await github_integration.initialize_repository(request.username)
+#         if success:
+#             return {"message": "GitHub integration setup successfully", "repository": f"{request.username}/tweet-tracker-backups"}
+#         else:
+#             return {"error": "Failed to setup GitHub integration"}
+#     except Exception as e:
+#         return {"error": str(e)}
 
-class GitHubBackupRequest(BaseModel):
-    version_tag: str
+# class GitHubBackupRequest(BaseModel):
+#     version_tag: str
 
-@api_router.post("/github/backup")
-async def create_github_backup(request: GitHubBackupRequest):
-    """Create a backup to GitHub"""
-    try:
-        app_data = {
-            'tracked_accounts': tracked_accounts,
-            'name_alerts': name_alerts,
-            'ca_alerts': ca_alerts,
-            'performance_data': performance_data,
-            'blacklist_words': blacklist_words,
-            'whitelist_accounts': whitelist_accounts,
-            'blacklist_accounts': blacklist_accounts,
-            'monitoring_config': monitoring_config.dict()
-        }
-        
-        result = await github_integration.create_backup(app_data, request.version_tag)
-        return result
-    except Exception as e:
-        return {"error": str(e)}
+# @api_router.post("/github/backup")
+# async def create_github_backup(request: GitHubBackupRequest):
+#     """Create a backup to GitHub"""
+#     try:
+#         app_data = {
+#             'tracked_accounts': tracked_accounts,
+#             'name_alerts': name_alerts,
+#             'ca_alerts': ca_alerts,
+#             'performance_data': performance_data,
+#             'blacklist_words': blacklist_words,
+#             'whitelist_accounts': whitelist_accounts,
+#             'blacklist_accounts': blacklist_accounts,
+#             'monitoring_config': monitoring_config.dict()
+#         }
+#         
+#         result = await github_integration.create_backup(app_data, request.version_tag)
+#         return result
+#     except Exception as e:
+#         return {"error": str(e)}
 
-@api_router.get("/github/backups")
-async def list_github_backups():
-    """List all GitHub backups"""
-    try:
-        backups = await github_integration.list_backups()
-        return {"backups": backups}
-    except Exception as e:
-        return {"error": str(e)}
+# @api_router.get("/github/backups")
+# async def list_github_backups():
+#     """List all GitHub backups"""
+#     try:
+#         backups = await github_integration.list_backups()
+#         return {"backups": backups}
+#     except Exception as e:
+#         return {"error": str(e)}
 
-@api_router.post("/github/restore/{backup_path:path}")
-async def restore_github_backup(backup_path: str):
-    """Restore from GitHub backup"""
-    try:
-        result = await github_integration.restore_backup(backup_path)
-        if result["success"]:
-            # Restore app state
-            global tracked_accounts, name_alerts, ca_alerts, performance_data
-            global blacklist_words, whitelist_accounts, blacklist_accounts
-            
-            app_data = result["app_data"]
-            tracked_accounts = app_data.get('tracked_accounts', [])
-            name_alerts = app_data.get('name_alerts', [])
-            ca_alerts = app_data.get('ca_alerts', [])
-            performance_data = app_data.get('performance_data', [])
-            blacklist_words = app_data.get('blacklist_words', [])
-            whitelist_accounts = app_data.get('whitelist_accounts', [])
-            blacklist_accounts = app_data.get('blacklist_accounts', [])
-        
-        return result
-    except Exception as e:
-        return {"error": str(e)}
+# @api_router.post("/github/restore/{backup_path:path}")
+# async def restore_github_backup(backup_path: str):
+#     """Restore from GitHub backup"""
+#     try:
+#         result = await github_integration.restore_backup(backup_path)
+#         if result["success"]:
+#             # Restore app state
+#             global tracked_accounts, name_alerts, ca_alerts, performance_data
+#             global blacklist_words, whitelist_accounts, blacklist_accounts
+#             
+#             app_data = result["app_data"]
+#             tracked_accounts = app_data.get('tracked_accounts', [])
+#             name_alerts = app_data.get('name_alerts', [])
+#             ca_alerts = app_data.get('ca_alerts', [])
+#             performance_data = app_data.get('performance_data', [])
+#             blacklist_words = app_data.get('blacklist_words', [])
+#             whitelist_accounts = app_data.get('whitelist_accounts', [])
+#             blacklist_accounts = app_data.get('blacklist_accounts', [])
+#         
+#         return result
+#     except Exception as e:
+#         return {"error": str(e)}
 
-@api_router.delete("/github/backup/{backup_path:path}")
-async def delete_github_backup(backup_path: str):
-    """Delete a GitHub backup"""
-    try:
-        success = await github_integration.delete_backup(backup_path)
-        return {"success": success}
-    except Exception as e:
-        return {"error": str(e)}
+# @api_router.delete("/github/backup/{backup_path:path}")
+# async def delete_github_backup(backup_path: str):
+#     """Delete a GitHub backup"""
+#     try:
+#         success = await github_integration.delete_backup(backup_path)
+#         return {"success": success}
+#     except Exception as e:
+#         return {"error": str(e)}
 
-@api_router.get("/github/stats")
-async def get_github_stats():
-    """Get GitHub repository statistics"""
-    try:
-        stats = await github_integration.get_repository_stats()
-        return stats
-    except Exception as e:
-        return {"error": str(e)}
+# @api_router.get("/github/stats")
+# async def get_github_stats():
+#     """Get GitHub repository statistics"""
+#     try:
+#         stats = await github_integration.get_repository_stats()
+#         return stats
+#     except Exception as e:
+#         return {"error": str(e)}
 
 @api_router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
