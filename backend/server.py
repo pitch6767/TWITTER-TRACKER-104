@@ -401,7 +401,6 @@ class PumpFunWebSocketClient:
 pump_client = PumpFunWebSocketClient()
 x_monitor = XAccountMonitor()
 real_time_monitor = RealTimeXMonitor(db)
-# github_integration = GitHubIntegration()  # Commented out - GitHub integration disabled
 
 # Global configuration
 monitoring_config = MonitoringConfig()
