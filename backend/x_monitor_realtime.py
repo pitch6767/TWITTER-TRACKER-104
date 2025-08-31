@@ -204,7 +204,7 @@ class RealTimeXMonitor:
                     await self._use_enhanced_fallback()
                     
             except Exception as e:
-                logger.error(f"Scraping failed: {e}, using fallback accounts")
+                logger.error(f"Scraping failed: {e}, using enhanced fallback")
                 await self._use_enhanced_fallback()
                 
         except Exception as e:
