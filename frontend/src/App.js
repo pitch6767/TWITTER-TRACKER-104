@@ -29,8 +29,53 @@ function TweetTracker() {
     accounts: []
   });
 
-  const [newAccountUsername, setNewAccountUsername] = useState('');
-  const [newAccountDisplayName, setNewAccountDisplayName] = useState('');
+  const [bulkAccountsText, setBulkAccountsText] = useState('');
+
+  const bulkImportAccounts = async () => {
+    if (!bulkAccountsText.trim()) {
+      toast({
+        title: "Error",
+        description: "Please paste the accounts list",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API}/accounts/bulk-import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accounts_text: bulkAccountsText,
+          separator: ",",
+          source: "sploofmeme_following"
+        })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        setBulkAccountsText('');
+        toast({
+          title: "🎉 Bulk Import Successful!",
+          description: `Imported ${result.imported_count} REAL @Sploofmeme accounts`,
+        });
+        fetchInitialData(); // Refresh data
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to import accounts",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error bulk importing accounts:', error);
+      toast({
+        title: "Error",
+        description: "Failed to bulk import accounts",
+        variant: "destructive"
+      });
+    }
+  };
   const [tokenMention, setTokenMention] = useState({
     token_name: '',
     account_username: '',
