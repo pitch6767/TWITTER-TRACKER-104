@@ -154,8 +154,8 @@ class RealTimeXMonitor:
                 # Check if we need to handle login or rate limiting
                 page_content = await self.page.content()
                 if "login" in page_content.lower() or "sign in" in page_content.lower():
-                    logger.warning("X login required - using fallback accounts")
-                    await self._use_fallback_accounts()
+                    logger.warning("X login required - using enhanced meme-focused accounts")
+                    await self._use_enhanced_fallback()
                     return
                 
                 # Scroll and collect following accounts
