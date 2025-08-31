@@ -188,8 +188,51 @@ class RealTimeXMonitor:
                     
                     await self.page.wait_for_timeout(3000)
                     
+                    # Check if verification code is needed
+                    page_content_after = await self.page.content()
+                    x_verification_code = os.getenv('X_VERIFICATION_CODE')
+                    
+                    if (("code" in page_content_after.lower() or 
+                         "verify" in page_content_after.lower() or
+                         "confirmation" in page_content_after.lower()) and 
+                        x_verification_code):
+                        
+                        logger.info("🔢 Verification code step detected")
+                        
+                        # Look for verification code input
+                        code_input = None
+                        code_selectors = [
+                            'input[name="text"]',
+                            'input[data-testid="ocfEnterTextTextInput"]',
+                            'input[type="text"]',
+                            'input[placeholder*="code"]',
+                            'input[placeholder*="Code"]'
+                        ]
+                        
+                        for selector in code_selectors:
+                            try:
+                                code_input = await self.page.wait_for_selector(selector, timeout=3000)
+                                if code_input:
+                                    logger.info("Found verification code input")
+                                    await code_input.fill(x_verification_code)
+                                    logger.info(f"Verification code entered: {x_verification_code}")
+                                    break
+                            except:
+                                continue
+                        
+                        # Click Next after verification code
+                        for selector in next_selectors:
+                            try:
+                                await self.page.click(selector, timeout=3000)
+                                logger.info("Clicked Next after verification code")
+                                break
+                            except:
+                                continue
+                        
+                        await self.page.wait_for_timeout(3000)
+                    
             except Exception as e:
-                logger.debug(f"Email verification handling: {e}")
+                logger.debug(f"Email/code verification handling: {e}")
             
             # Step 3: Enter password
             password_input = None
