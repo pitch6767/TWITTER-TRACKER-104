@@ -782,20 +782,73 @@ saylor"
 
           {/* Performance Tab */}
           <TabsContent value="performance">
-            <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="text-green-400">Performance Metrics</CardTitle>
-                <CardDescription>
-                  Track how accounts perform with alerts and gains
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center text-slate-500 py-8">
-                  <Activity className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>Performance tracking coming soon</p>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="space-y-6">
+              {/* Top Posting Accounts */}
+              <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle className="text-green-400 flex items-center">
+                    <TrendingUp className="h-5 w-5 mr-2" />
+                    Top Posting X Accounts
+                  </CardTitle>
+                  <CardDescription>
+                    Which @Sploofmeme following accounts post trending tokens the most
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="text-center text-slate-500 py-8">
+                      <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p className="text-lg font-medium">📊 Tracking Account Performance</p>
+                      <p className="text-sm">Statistics will appear as accounts post trending tokens</p>
+                      <div className="mt-4 grid grid-cols-3 gap-4 text-xs">
+                        <div className="bg-slate-700/30 p-3 rounded">
+                          <div className="text-purple-400 font-medium">Most Posts</div>
+                          <div className="text-slate-400">Track volume</div>
+                        </div>
+                        <div className="bg-slate-700/30 p-3 rounded">
+                          <div className="text-blue-400 font-medium">Best Success Rate</div>
+                          <div className="text-slate-400">Tokens → CAs</div>
+                        </div>
+                        <div className="bg-slate-700/30 p-3 rounded">
+                          <div className="text-green-400 font-medium">CA Performance</div>
+                          <div className="text-slate-400">Post-CA gains</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* CA Performance Tracking */}
+              <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle className="text-blue-400 flex items-center">
+                    <DollarSign className="h-5 w-5 mr-2" />
+                    CA Performance Tracking
+                  </CardTitle>
+                  <CardDescription>
+                    Track token performance after getting contract addresses
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center text-slate-500 py-8">
+                    <TrendingUp className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p className="text-lg font-medium">⚡ CA Performance Dashboard</p>
+                    <p className="text-sm">Track gains/losses after CA launches</p>
+                    <div className="mt-4 grid grid-cols-2 gap-4 text-xs">
+                      <div className="bg-green-900/20 p-3 rounded border border-green-500/30">
+                        <div className="text-green-400 font-medium">Successful CAs</div>
+                        <div className="text-slate-400">Tokens with positive gains</div>
+                      </div>
+                      <div className="bg-red-900/20 p-3 rounded border border-red-500/30">
+                        <div className="text-red-400 font-medium">Failed CAs</div>
+                        <div className="text-slate-400">Tokens with losses</div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* Versions Tab */}
