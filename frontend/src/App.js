@@ -30,6 +30,8 @@ function TweetTracker() {
   });
 
   const [bulkAccountsText, setBulkAccountsText] = useState('');
+  const [newAccountUsername, setNewAccountUsername] = useState('');
+  const [newAccountDisplayName, setNewAccountDisplayName] = useState('');
 
   const bulkImportAccounts = async () => {
     if (!bulkAccountsText.trim()) {
