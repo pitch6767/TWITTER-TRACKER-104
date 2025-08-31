@@ -13,7 +13,6 @@ import re
 from pathlib import Path
 import random
 from x_monitor_realtime import RealTimeXMonitor
-# from github_integration import GitHubIntegration  # Commented out - GitHub integration disabled
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
