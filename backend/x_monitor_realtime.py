@@ -66,7 +66,7 @@ class RealTimeXMonitor:
             return False
 
     async def login_to_x(self):
-        """Login to X/Twitter using credentials"""
+        """Login to X/Twitter using credentials with enhanced error handling"""
         try:
             x_username = os.getenv('X_USERNAME')
             x_password = os.getenv('X_PASSWORD')
@@ -75,53 +75,172 @@ class RealTimeXMonitor:
                 logger.error("X credentials not found in environment variables")
                 return False
             
-            logger.info("Attempting to login to X...")
+            logger.info(f"Attempting to login to X as {x_username}...")
             
             # Navigate to X login page
-            await self.page.goto('https://x.com/i/flow/login', wait_until='networkidle', timeout=30000)
-            await self.page.wait_for_timeout(3000)
+            await self.page.goto('https://x.com/i/flow/login', wait_until='load', timeout=30000)
+            await self.page.wait_for_timeout(5000)
+            
+            # Take screenshot for debugging
+            logger.info("Taking screenshot of login page...")
+            
+            # Try multiple selectors for username input
+            username_input = None
+            selectors_to_try = [
+                'input[name="text"]',
+                'input[autocomplete="username"]', 
+                'input[data-testid="ocfEnterTextTextInput"]',
+                'input[placeholder*="username"]',
+                'input[type="text"]'
+            ]
+            
+            for selector in selectors_to_try:
+                try:
+                    username_input = await self.page.wait_for_selector(selector, timeout=3000)
+                    if username_input:
+                        logger.info(f"Found username input with selector: {selector}")
+                        break
+                except:
+                    continue
+            
+            if not username_input:
+                logger.error("Could not find username input field")
+                return False
             
             # Enter username
-            try:
-                username_input = await self.page.wait_for_selector('input[name="text"]', timeout=10000)
-                await username_input.fill(x_username)
-                await self.page.click('text=Next')
-                await self.page.wait_for_timeout(2000)
-            except Exception as e:
-                logger.error(f"Error entering username: {e}")
+            await username_input.fill(x_username)
+            logger.info("Username entered")
+            await self.page.wait_for_timeout(1000)
+            
+            # Click Next button - try multiple selectors
+            next_clicked = False
+            next_selectors = [
+                'div[role="button"]:has-text("Next")',
+                'button:has-text("Next")',
+                '[data-testid="LoginForm_Login_Button"]',
+                'div[data-testid="ocfEnterTextNextButton"]'
+            ]
+            
+            for selector in next_selectors:
+                try:
+                    await self.page.click(selector, timeout=3000)
+                    next_clicked = True
+                    logger.info(f"Clicked Next with selector: {selector}")
+                    break
+                except:
+                    continue
+            
+            if not next_clicked:
+                logger.error("Could not click Next button")
                 return False
             
-            # Handle potential phone/email verification step
+            await self.page.wait_for_timeout(3000)
+            
+            # Handle potential additional verification
             try:
-                # Check if there's a phone number or email verification step
-                if await self.page.is_visible('text=Enter your phone number or username'):
-                    logger.info("Phone/username verification step detected")
-                    phone_input = await self.page.wait_for_selector('input[name="text"]', timeout=5000)
-                    await phone_input.fill(x_username)
-                    await self.page.click('text=Next')
-                    await self.page.wait_for_timeout(2000)
-            except:
-                pass  # Skip if not present
+                page_content = await self.page.content()
+                if "unusual activity" in page_content.lower() or "suspicious" in page_content.lower():
+                    logger.warning("Unusual activity detected - may need manual verification")
+                    return False
+                
+                # Check for phone/email verification
+                verification_selectors = [
+                    'input[name="text"]',
+                    'input[data-testid="ocfEnterTextTextInput"]'
+                ]
+                
+                for selector in verification_selectors:
+                    try:
+                        if await self.page.is_visible(selector):
+                            logger.info("Additional verification step detected")
+                            verification_input = await self.page.wait_for_selector(selector, timeout=2000)
+                            await verification_input.fill(x_username)
+                            
+                            # Click next again
+                            for next_sel in next_selectors:
+                                try:
+                                    await self.page.click(next_sel, timeout=2000)
+                                    break
+                                except:
+                                    continue
+                            break
+                    except:
+                        continue
+                        
+                await self.page.wait_for_timeout(2000)
+                
+            except Exception as e:
+                logger.debug(f"Verification step handling: {e}")
             
             # Enter password
-            try:
-                password_input = await self.page.wait_for_selector('input[name="password"]', timeout=10000)
-                await password_input.fill(x_password)
-                await self.page.click('text=Log in')
-                await self.page.wait_for_timeout(5000)
-            except Exception as e:
-                logger.error(f"Error entering password: {e}")
+            password_input = None
+            password_selectors = [
+                'input[name="password"]',
+                'input[type="password"]',
+                'input[autocomplete="current-password"]'
+            ]
+            
+            for selector in password_selectors:
+                try:
+                    password_input = await self.page.wait_for_selector(selector, timeout=5000)
+                    if password_input:
+                        logger.info(f"Found password input with selector: {selector}")
+                        break
+                except:
+                    continue
+            
+            if not password_input:
+                logger.error("Could not find password input field")
                 return False
             
-            # Check if login was successful
-            await self.page.wait_for_timeout(3000)
-            current_url = self.page.url
+            await password_input.fill(x_password)
+            logger.info("Password entered")
+            await self.page.wait_for_timeout(1000)
             
-            if 'home' in current_url or 'x.com' in current_url and 'login' not in current_url:
+            # Click Log in button
+            login_clicked = False
+            login_selectors = [
+                'div[role="button"]:has-text("Log in")',
+                'button:has-text("Log in")',
+                '[data-testid="LoginForm_Login_Button"]',
+                'div[data-testid="LoginForm_Login_Button"]'
+            ]
+            
+            for selector in login_selectors:
+                try:
+                    await self.page.click(selector, timeout=3000)
+                    login_clicked = True
+                    logger.info(f"Clicked Log in with selector: {selector}")
+                    break
+                except:
+                    continue
+            
+            if not login_clicked:
+                logger.error("Could not click Log in button")
+                return False
+            
+            # Wait for login to complete
+            await self.page.wait_for_timeout(8000)
+            
+            # Check if login was successful
+            current_url = self.page.url
+            logger.info(f"Current URL after login: {current_url}")
+            
+            # Multiple success indicators
+            success_indicators = [
+                'home' in current_url,
+                'x.com' in current_url and 'login' not in current_url and 'flow' not in current_url,
+                await self.page.is_visible('[data-testid="SideNav_NewTweet_Button"]') if await self.page.is_visible('[data-testid="SideNav_NewTweet_Button"]', timeout=2000) else False
+            ]
+            
+            if any(success_indicators):
                 logger.info("✅ Successfully logged into X!")
                 return True
             else:
-                logger.error("❌ Login failed - still on login page")
+                logger.error(f"❌ Login failed - URL: {current_url}")
+                # Take screenshot for debugging
+                page_content_snippet = (await self.page.content())[:500]
+                logger.debug(f"Page content snippet: {page_content_snippet}")
                 return False
                 
         except Exception as e:
