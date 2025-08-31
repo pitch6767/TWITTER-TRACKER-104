@@ -48,7 +48,7 @@ class RealTimeXMonitor:
         try:
             playwright = await async_playwright().start()
             self.browser = await playwright.chromium.launch(
-                headless=False,  # Run in visible mode for testing
+                headless=True,  # Must be headless in container
                 args=[
                     '--no-sandbox',
                     '--disable-dev-shm-usage',
@@ -56,7 +56,6 @@ class RealTimeXMonitor:
                     '--disable-features=VizDisplayCompositor',
                     '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                     '--disable-web-security',
-                    '--disable-features=VizDisplayCompositor',
                     '--start-maximized'
                 ]
             )
@@ -76,7 +75,7 @@ class RealTimeXMonitor:
                 });
             """)
             
-            logger.info("Browser initialized successfully (visible mode for testing)")
+            logger.info("Browser initialized successfully (headless mode)")
             return True
         except Exception as e:
             logger.error(f"Failed to initialize browser: {e}")
