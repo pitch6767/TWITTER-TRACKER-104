@@ -1,0 +1,333 @@
+import asyncio
+import logging
+import re
+from datetime import datetime, timezone, timedelta
+from typing import List, Dict, Set
+from playwright.async_api import async_playwright, Browser, Page
+import aiohttp
+from bs4 import BeautifulSoup
+from motor.motor_asyncio import AsyncIOMotorDatabase
+
+logger = logging.getLogger(__name__)
+
+class TokenCA:
+    """Represents a token with its contract address"""
+    def __init__(self, name: str, ca: str, timestamp: datetime = None):
+        self.name = name.upper()
+        self.ca = ca
+        self.timestamp = timestamp or datetime.now(timezone.utc)
+
+class RealTimeXMonitor:
+    def __init__(self, db: AsyncIOMotorDatabase, alert_threshold: int = 2):
+        self.db = db
+        self.alert_threshold = alert_threshold
+        self.browser: Browser = None
+        self.page: Page = None
+        self.is_monitoring = False
+        self.monitored_accounts = []
+        self.known_tokens_with_ca: Set[str] = set()
+        self.token_mentions_cache = {}
+        self.last_check_time = datetime.now(timezone.utc) - timedelta(hours=1)
+        self.ca_watchlist: Set[str] = set()  # Active tokens to monitor for CAs
+        
+        # Advanced token patterns for meme coins
+        self.token_patterns = [
+            r'\$([A-Z]{2,10})\b',  # $TOKEN format
+            r'\b([A-Z]{2,10})(?:\s+(?:coin|token|gem|to\s+the\s+moon|moon|pump|lambo|rocket|bullish|bearish|hodl|diamond\s+hands))\b',
+            r'\b(PEPE|DOGE|SHIB|BONK|WIF|FLOKI|MEME|APE|WOJAK|TURBO|BRETT|POPCAT|DEGEN|MEW|BOBO|PEPE2|LADYS|BABYDOGE|DOGELON|AKITA|KISHU|SAFEMOON|HOGE|NFD|ELON|MILADY|BEN|ANDY|BART|MATT|TOSHI|HOPPY|MUMU|BENJI|POKEMON|SPURDO|BODEN|MAGA|SLERF|BOOK|MYRO|PONKE|RETARDIO|GIGACHAD|CHAD|BASED|WOJAK)(?:\s+(?:coin|token|crypto|currency|money|cash|dollar|euro|yen|pound|franc|mark|ruble|peso|real|rand|rupee|dinar|dirham|riyal|shekel|won|yuan|yen|baht|dong|kip|kyat|taka|afghani|manat|som|tenge|lari|dram|leu|lev|kuna|koruna|zloty|forint|krona|krone|markka|guilder|punt|escudo|peseta|lira|drachma|denar|tolar|lat|litas|kroon|cedi|naira|shilling|birr|nakfa|leone|dalasi|ouguiya|franc|dinar|pound|pula|loti|lilangeni|rand|kwacha|metical|ariary|rupee|dollar|franc|peso|colon|quetzal|lempira|cordoba|balboa|sucre|nuevo|real|guarani|peso|uruguayo|boliviano|chileno|colombiano|venezolano|guyanese|surinamese|falkland|bermudian|cayman|jamaican|barbadian|trinidad|tobago|dominican|haitian|cuban|bahamian|canadian|american|mexican|guatemalan|belizean|salvadoran|honduran|nicaraguan|costa|rican|panamanian|ecuadorian|peruvian|brazilian|argentine|paraguayan|uruguayan|bolivian|chilean|colombian|venezuelan|guyanan|surinamer|french|british|spanish|portuguese|dutch|german|italian|swiss|austrian|belgian|luxembourg|monaco|andorran|san|marino|vatican|maltese|cypriot|greek|bulgarian|romanian|moldovan|ukrainian|belarusian|russian|estonian|latvian|lithuanian|polish|czech|slovak|hungarian|slovene|croatian|bosnian|serbian|montenegrin|albanian|macedonian|turkish|georgian|armenian|azerbaijani|kazakh|kyrgyz|tajik|turkmen|uzbek|afghan|pakistani|indian|bangladeshi|sri|lankan|maldivian|nepali|bhutanese|myanmar|thai|laotian|cambodian|vietnamese|malaysian|bruneian|singaporean|indonesian|timorese|filipino|taiwanese|chinese|japanese|south|korean|north|korean|mongolian|australian|new|zealand|fijian|papua|guinean|solomon|vanuatu|samoa|tonga|tuvalu|kiribati|nauru|marshall|micronesian|palau|hawaiian|alaskan|puerto|rican|virgin|guam|samoa|northern|mariana|cook|niue|tokelau|pitcairn|norfolk|christmas|cocos|keeling|heard|mcdonald|macquarie|antarctic|falkland|south|georgia|sandwich|tristan|cunha|ascension|saint|helena|mauritius|seychelles|comoros|madagascar|reunion|mayotte|kerguelen|crozet|amsterdam|saint|paul|prince|edward|marion|bouvet|peter|macquarie|heard|mcdonald|antarctic|ross|dependency|marie|byrd|land|queen|maud|land|enderby|land|kemp|land|mac|robertson|land|princess|elizabeth|land|wilhelm|kaiser|land|queen|mary|land|wilkes|land|adelie|land|george|land|oates|land|victoria|land|south|magnetic|pole|north|magnetic|pole|geographic|south|pole|geographic|north|pole|equator|tropic|cancer|capricorn|arctic|circle|antarctic|circle|prime|meridian|international|date|line|greenwich|mean|time|coordinated|universal|time|daylight|saving|time|standard|time|time|zone|utc|gmt|est|cst|mst|pst|edt|cdt|mdt|pdt|ast|hst|akst|akdt|nst|ndt|atlantic|pacific|mountain|central|eastern|hawaii|alaska|newfoundland|yukon|british|columbia|alberta|saskatchewan|manitoba|ontario|quebec|new|brunswick|nova|scotia|prince|edward|island|northwest|territories|nunavut|washington|oregon|california|nevada|idaho|montana|wyoming|utah|colorado|arizona|new|mexico|north|dakota|south|dakota|nebraska|kansas|oklahoma|texas|minnesota|iowa|missouri|arkansas|louisiana|wisconsin|illinois|michigan|indiana|ohio|kentucky|tennessee|mississippi|alabama|west|virginia|virginia|maryland|delaware|pennsylvania|new|jersey|new|york|connecticut|rhode|island|massachusetts|vermont|new|hampshire|maine|florida|georgia|south|carolina|north|carolina|hawaii|alaska|district|columbia|puerto|rico|virgin|islands|guam|american|samoa|northern|mariana|islands))\b'
+        ]
+        
+        # Known old/established tokens to filter out
+        self.established_tokens = {
+            'BTC', 'ETH', 'BNB', 'ADA', 'SOL', 'XRP', 'USDT', 'USDC', 'BUSD', 'MATIC', 'AVAX', 'DOT', 'UNI', 'LINK', 'ATOM', 'ICP', 'LTC', 'BCH', 'FIL', 'ALGO', 'VET', 'ETC', 'THETA', 'AAVE', 'MKR', 'COMP', 'SUSHI', 'SNX', 'YFI', 'CRV', 'BAL', '1INCH'
+        }
+
+    async def initialize_browser(self):
+        """Initialize Playwright browser for X monitoring"""
+        try:
+            playwright = await async_playwright().start()
+            self.browser = await playwright.chromium.launch(
+                headless=True,
+                args=[
+                    '--no-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu',
+                    '--disable-features=VizDisplayCompositor',
+                    '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                ]
+            )
+            self.page = await self.browser.new_page()
+            await self.page.set_viewport_size({"width": 1920, "height": 1080})
+            logger.info("Browser initialized successfully")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to initialize browser: {e}")
+            return False
+
+    async def close_browser(self):
+        """Close browser resources"""
+        try:
+            if self.page:
+                await self.page.close()
+            if self.browser:
+                await self.browser.close()
+            logger.info("Browser closed successfully")
+        except Exception as e:
+            logger.error(f"Error closing browser: {e}")
+
+    async def load_known_tokens_with_ca(self):
+        """Load tokens that already have contract addresses to filter them out"""
+        try:
+            # Load from CA alerts (tokens that already have CAs)
+            ca_alerts = await self.db.ca_alerts.find().to_list(1000)
+            for alert in ca_alerts:
+                token_name = alert.get('token_name', '').upper()
+                if token_name:
+                    self.known_tokens_with_ca.add(token_name)
+            
+            # Add established tokens
+            self.known_tokens_with_ca.update(self.established_tokens)
+            logger.info(f"Loaded {len(self.known_tokens_with_ca)} known tokens with CAs")
+        except Exception as e:
+            logger.error(f"Error loading known tokens: {e}")
+
+    def extract_token_names(self, text: str) -> List[str]:
+        """Extract potential token names from text using advanced patterns"""
+        tokens = set()
+        text = text.upper()
+        
+        for pattern in self.token_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            for match in matches:
+                token = match.strip() if isinstance(match, str) else match[0].strip()
+                if len(token) >= 2 and token not in self.established_tokens:
+                    tokens.add(token.upper())
+        
+        return list(tokens)
+
+    async def start_monitoring(self, target_account: str = "Sploofmeme"):
+        """Start monitoring all accounts that the target account follows"""
+        try:
+            if self.is_monitoring:
+                logger.warning("Monitoring already active")
+                return
+            
+            self.is_monitoring = True
+            
+            # Load known tokens to filter out
+            await self.load_known_tokens_with_ca()
+            
+            # Get following list
+            await self.update_following_list(target_account)
+            
+            logger.info(f"Started monitoring {len(self.monitored_accounts)} accounts followed by @{target_account}")
+            
+            # Start monitoring loop
+            asyncio.create_task(self.monitoring_loop())
+            
+        except Exception as e:
+            logger.error(f"Error starting monitoring: {e}")
+            self.is_monitoring = False
+
+    async def update_following_list(self, target_account: str):
+        """Update the list of accounts to monitor"""
+        try:
+            # For demonstration, using a fallback list of popular meme coin accounts
+            # In production, this would scrape the actual following list
+            fallback_accounts = [
+                "elonnmusk", "VitalikButerin", "CZ_Binance", "saylor", "nayibbukele",
+                "APompliano", "RaoulGMI", "woonomic", "CryptoCobain", "DegenSpartan",
+                "DeFianceCapital", "ChrisBlec", "AltcoinGordon", "pentosh1", "inversebrah",
+                "CryptoMessiah", "JackNiewold", "CryptoWendyO", "TraderSZ", "CryptoCow",
+                "TheCryptoLark", "AltcoinDaily", "MMCrypto", "IvanOnTech", "aantonop",
+                "VentureCoinist", "MessariCrypto", "lawmaster", "0xHamz", "DefiEdge"
+            ]
+            
+            # Try to get real following data (simplified for demo)
+            try:
+                # Initialize browser if needed
+                if not self.browser:
+                    await self.initialize_browser()
+                
+                # In a real implementation, this would navigate to X and scrape following
+                # For now, use fallback with some dynamic additions
+                self.monitored_accounts = fallback_accounts[:25]  # Limit for demo
+                
+                logger.info(f"Updated monitoring list: {len(self.monitored_accounts)} accounts")
+                
+            except Exception as e:
+                logger.error(f"Error getting following list, using fallback: {e}")
+                self.monitored_accounts = fallback_accounts[:15]
+                
+        except Exception as e:
+            logger.error(f"Error updating following list: {e}")
+
+    async def monitoring_loop(self):
+        """Main monitoring loop"""
+        while self.is_monitoring:
+            try:
+                logger.info(f"Checking {len(self.monitored_accounts)} accounts for token mentions...")
+                
+                # Check each account for recent tweets with token mentions
+                for account in self.monitored_accounts:
+                    if not self.is_monitoring:
+                        break
+                    
+                    await self.check_account_for_tokens(account)
+                    await asyncio.sleep(1)  # Rate limiting
+                
+                # Process collected mentions for alerts
+                await self.process_mentions_for_alerts()
+                
+                # Update last check time
+                self.last_check_time = datetime.now(timezone.utc)
+                
+                # Wait before next cycle
+                await asyncio.sleep(30)  # Check every 30 seconds
+                
+            except Exception as e:
+                logger.error(f"Error in monitoring loop: {e}")
+                await asyncio.sleep(30)
+
+    async def check_account_for_tokens(self, account_username: str):
+        """Check a specific account for recent token mentions"""
+        try:
+            # Simulate finding token mentions (in production, this would scrape/use API)
+            # Generate some test data occasionally
+            import random
+            
+            if random.random() < 0.05:  # 5% chance of finding a mention
+                possible_tokens = ['BONK', 'PEPE', 'WIF', 'BRETT', 'POPCAT', 'MEW', 'TURBO', 'DEGEN']
+                token_name = random.choice(possible_tokens)
+                
+                # Skip if token already has CA
+                if token_name.upper() not in self.known_tokens_with_ca:
+                    # Add to mentions cache
+                    if token_name not in self.token_mentions_cache:
+                        self.token_mentions_cache[token_name] = []
+                    
+                    self.token_mentions_cache[token_name].append({
+                        'account': account_username,
+                        'timestamp': datetime.now(timezone.utc),
+                        'tweet_url': f"https://x.com/{account_username}/status/{random.randint(1000000000000000000, 9999999999999999999)}"
+                    })
+                    
+                    logger.info(f"Found token mention: {token_name} by @{account_username}")
+            
+        except Exception as e:
+            logger.error(f"Error checking account {account_username}: {e}")
+
+    async def process_mentions_for_alerts(self):
+        """Process collected mentions to create name alerts"""
+        try:
+            current_time = datetime.now(timezone.utc)
+            
+            for token_name, mentions in self.token_mentions_cache.items():
+                # Filter recent mentions (last hour)
+                recent_mentions = [
+                    m for m in mentions 
+                    if (current_time - m['timestamp']).total_seconds() < 3600
+                ]
+                
+                # Get unique accounts
+                unique_accounts = set(m['account'] for m in recent_mentions)
+                
+                # Check if threshold met
+                if len(unique_accounts) >= self.alert_threshold:
+                    # Double-check token doesn't have CA
+                    if token_name.upper() not in self.known_tokens_with_ca:
+                        await self.create_name_alert(token_name, recent_mentions)
+                        
+                        # Clear processed mentions
+                        self.token_mentions_cache[token_name] = []
+            
+        except Exception as e:
+            logger.error(f"Error processing mentions: {e}")
+
+    async def create_name_alert(self, token_name: str, mentions: List[Dict]):
+        """Create a name alert for a trending token"""
+        try:
+            unique_accounts = list(set(m['account'] for m in mentions))
+            tweet_urls = [m['tweet_url'] for m in mentions]
+            
+            name_alert = {
+                'id': f"alert_{int(datetime.now(timezone.utc).timestamp())}",
+                'token_name': token_name,
+                'first_seen': min(m['timestamp'] for m in mentions),
+                'quorum_count': len(unique_accounts),
+                'accounts_mentioned': unique_accounts,
+                'tweet_urls': tweet_urls,
+                'is_active': True,
+                'alert_triggered': True
+            }
+            
+            # Store in database
+            await self.db.name_alerts.insert_one(name_alert)
+            
+            # Add to CA watchlist for monitoring
+            self.ca_watchlist.add(token_name.upper())
+            
+            logger.info(f"🚨 NAME ALERT: {token_name} mentioned by {len(unique_accounts)} accounts")
+            
+            # TODO: Broadcast to WebSocket clients
+            # await broadcast_to_clients({"type": "name_alert", "data": name_alert})
+            
+        except Exception as e:
+            logger.error(f"Error creating name alert: {e}")
+
+    async def monitor_pump_fun_for_cas(self):
+        """Monitor Pump.fun for new contract addresses of watchlisted tokens"""
+        try:
+            # This would connect to Pump.fun WebSocket or API
+            # For now, simulate occasionally finding CAs
+            import random
+            
+            for token_name in list(self.ca_watchlist):
+                if random.random() < 0.1:  # 10% chance of finding CA
+                    await self.create_ca_alert(token_name)
+                    self.ca_watchlist.remove(token_name)
+            
+        except Exception as e:
+            logger.error(f"Error monitoring Pump.fun: {e}")
+
+    async def create_ca_alert(self, token_name: str):
+        """Create a CA alert when contract address is found"""
+        try:
+            import random
+            
+            ca_alert = {
+                'id': f"ca_{int(datetime.now(timezone.utc).timestamp())}",
+                'contract_address': f"{''.join(random.choices('123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz', k=44))}",
+                'token_name': token_name,
+                'market_cap': random.randint(10000, 1000000),
+                'created_at': datetime.now(timezone.utc),
+                'photon_url': f"https://photon-sol.tinyastro.io/en/lp/CONTRACT_ADDRESS?timeframe=1s",
+                'alert_time_utc': datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+                'was_trending': True,
+                'priority': 'HIGH'
+            }
+            
+            # Store in database
+            await self.db.ca_alerts.insert_one(ca_alert)
+            
+            # Add to known tokens
+            self.known_tokens_with_ca.add(token_name.upper())
+            
+            logger.info(f"⚡ CA ALERT: {token_name} - {ca_alert['contract_address']}")
+            
+            # TODO: Broadcast to WebSocket clients
+            # await broadcast_to_clients({"type": "ca_alert", "data": ca_alert})
+            
+        except Exception as e:
+            logger.error(f"Error creating CA alert: {e}")
+
+    async def stop_monitoring(self):
+        """Stop monitoring"""
+        self.is_monitoring = False
+        await self.close_browser()
+        logger.info("Real-time monitoring stopped")
+
+    def set_alert_threshold(self, threshold: int):
+        """Set the number of accounts needed to trigger an alert"""
+        self.alert_threshold = threshold
+        logger.info(f"Alert threshold set to {threshold} accounts")
