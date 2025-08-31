@@ -519,84 +519,71 @@ class BulkAccountImport(BaseModel):
     separator: str = ","  # How accounts are separated (comma, newline, space)
     source: str = "sploofmeme_following"
 
-@api_router.post("/accounts/bulk-import")
-async def bulk_import_sploofmeme_accounts(import_data: BulkAccountImport):
-    """Bulk import large list of @Sploofmeme following accounts"""
+@api_router.post("/accounts/emergency-restore")
+async def emergency_restore_accounts():
+    """EMERGENCY: Restore the 130 @Sploofmeme accounts if they get lost"""
     try:
+        # Load from database
+        accounts = await db.x_accounts.find({"is_active": True}).to_list(2000)
+        
+        if not accounts:
+            return {"error": "No accounts found in database!", "count": 0}
+        
+        account_usernames = [acc['username'] for acc in accounts]
+        
+        # Restore to all monitoring systems
         global tracked_accounts
+        tracked_accounts = accounts
         
-        # Parse the accounts text
-        accounts_text = import_data.accounts_text.strip()
+        # Restore to real-time monitor
+        real_time_monitor.monitored_accounts = account_usernames
         
-        # Split by separator and also handle multiple separators
-        import re
-        # Split by comma, newline, semicolon, or multiple spaces
-        raw_accounts = re.split(r'[,;\n\r\s]+', accounts_text)
+        # Force restart monitoring
+        if not real_time_monitor.is_monitoring:
+            real_time_monitor.is_monitoring = True
+            asyncio.create_task(real_time_monitor.monitoring_loop())
         
-        # Clean and validate usernames
-        clean_accounts = []
-        for account in raw_accounts:
-            clean_username = account.strip().lower().replace('@', '').replace('/', '').replace('https:', '').replace('x.com', '').replace('twitter.com', '')
-            if (len(clean_username) > 0 and 
-                clean_username.replace('_', '').replace('-', '').isalnum() and
-                len(clean_username) <= 15 and
-                clean_username not in ['www', 'com', 'https', 'http']):
-                clean_accounts.append(clean_username)
-        
-        # Remove duplicates
-        clean_accounts = list(set(clean_accounts))
-        
-        logger.info(f"Processing {len(clean_accounts)} unique accounts from bulk import")
-        
-        # Clear existing accounts from this source
-        await db.x_accounts.delete_many({"source": import_data.source})
-        
-        # Create account objects in batches
-        imported_accounts = []
-        batch_size = 100
-        
-        for i in range(0, len(clean_accounts), batch_size):
-            batch = clean_accounts[i:i+batch_size]
-            batch_objects = []
-            
-            for username in batch:
-                account_obj = {
-                    "id": str(uuid.uuid4()),
-                    "username": username,
-                    "display_name": username,
-                    "is_active": True,
-                    "created_at": datetime.now(timezone.utc),
-                    "source": import_data.source,
-                    "imported_at": datetime.now(timezone.utc)
-                }
-                batch_objects.append(account_obj)
-            
-            # Bulk insert batch
-            if batch_objects:
-                await db.x_accounts.insert_many(batch_objects)
-                imported_accounts.extend(batch_objects)
-        
-        # Update tracked accounts
-        tracked_accounts = imported_accounts
-        
-        # Update real-time monitor with REAL @Sploofmeme accounts
-        if hasattr(real_time_monitor, 'monitored_accounts'):
-            real_time_monitor.monitored_accounts = clean_accounts
-            logger.info(f"🎉 Real-time monitor updated with {len(clean_accounts)} REAL @Sploofmeme accounts!")
-        
-        logger.info(f"🎉 Successfully imported {len(clean_accounts)} REAL @Sploofmeme following accounts!")
+        logger.info(f"🆘 EMERGENCY RESTORE: {len(account_usernames)} accounts restored!")
         
         return {
             "success": True,
-            "message": f"Successfully imported {len(clean_accounts)} REAL @Sploofmeme following accounts!",
-            "imported_count": len(clean_accounts),
-            "sample_accounts": clean_accounts[:20],  # Show first 20
-            "total_accounts": len(clean_accounts)
+            "message": f"EMERGENCY RESTORE SUCCESSFUL: {len(account_usernames)} accounts restored",
+            "restored_count": len(account_usernames),
+            "sample_accounts": account_usernames[:10]
         }
         
     except Exception as e:
-        logger.error(f"Error in bulk import: {e}")
-        return {"success": False, "error": str(e)}
+        logger.error(f"❌ Emergency restore failed: {e}")
+        return {"error": str(e), "success": False}
+
+@api_router.get("/accounts/verify-status")
+async def verify_accounts_status():
+    """Verify account status across all systems"""
+    try:
+        # Check database
+        db_accounts = await db.x_accounts.find({"is_active": True}).to_list(2000)
+        db_count = len(db_accounts)
+        
+        # Check real-time monitor
+        monitor_count = len(real_time_monitor.monitored_accounts) if real_time_monitor.monitored_accounts else 0
+        
+        # Check tracked accounts
+        tracked_count = len(tracked_accounts)
+        
+        status = {
+            "database_accounts": db_count,
+            "monitor_accounts": monitor_count, 
+            "tracked_accounts": tracked_count,
+            "monitoring_active": real_time_monitor.is_monitoring,
+            "sample_db_accounts": [acc['username'] for acc in db_accounts[:5]],
+            "sample_monitor_accounts": real_time_monitor.monitored_accounts[:5] if real_time_monitor.monitored_accounts else [],
+            "all_systems_synced": db_count == monitor_count and monitor_count > 0
+        }
+        
+        return status
+        
+    except Exception as e:
+        return {"error": str(e)}
 
 @api_router.post("/mentions")
 async def add_token_mention(mention: TokenMention):
