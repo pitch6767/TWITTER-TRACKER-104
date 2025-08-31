@@ -44,22 +44,39 @@ class RealTimeXMonitor:
         }
 
     async def initialize_browser(self):
-        """Initialize Playwright browser for X monitoring"""
+        """Initialize Playwright browser for X monitoring with stealth settings"""
         try:
             playwright = await async_playwright().start()
             self.browser = await playwright.chromium.launch(
-                headless=True,
+                headless=False,  # Run in visible mode for testing
                 args=[
                     '--no-sandbox',
                     '--disable-dev-shm-usage',
-                    '--disable-gpu',
+                    '--disable-blink-features=AutomationControlled',
                     '--disable-features=VizDisplayCompositor',
-                    '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    '--disable-web-security',
+                    '--disable-features=VizDisplayCompositor',
+                    '--start-maximized'
                 ]
             )
-            self.page = await self.browser.new_page()
-            await self.page.set_viewport_size({"width": 1920, "height": 1080})
-            logger.info("Browser initialized successfully")
+            
+            # Create context with additional stealth
+            context = await self.browser.new_context(
+                viewport={'width': 1920, 'height': 1080},
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            )
+            
+            self.page = await context.new_page()
+            
+            # Add stealth scripts
+            await self.page.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined,
+                });
+            """)
+            
+            logger.info("Browser initialized successfully (visible mode for testing)")
             return True
         except Exception as e:
             logger.error(f"Failed to initialize browser: {e}")
