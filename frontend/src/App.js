@@ -680,6 +680,57 @@ function TweetTracker() {
 
           {/* Accounts Tab */}
           <TabsContent value="accounts" className="space-y-6">
+            {/* Bulk Import Real @Sploofmeme Accounts */}
+            <Card className="bg-gradient-to-r from-blue-900/30 to-green-900/30 border-blue-500/30 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="text-blue-400 flex items-center">
+                  <Users className="h-5 w-5 mr-2" />
+                  Import REAL @Sploofmeme Following List (800 accounts)
+                </CardTitle>
+                <CardDescription>
+                  Paste your exported list of accounts that @Sploofmeme follows - supports comma, newline, or space separated
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="bulk-accounts">Paste 800 @Sploofmeme Accounts Here</Label>
+                    <textarea
+                      id="bulk-accounts"
+                      placeholder="Paste your account list here... 
+Examples:
+elonmusk, vitalikbuterin, cz_binance, saylor
+OR
+elonmusk
+vitalikbuterin  
+cz_binance
+saylor"
+                      value={bulkAccountsText}
+                      onChange={(e) => setBulkAccountsText(e.target.value)}
+                      className="w-full h-32 p-3 bg-slate-700 border-slate-600 rounded-lg text-sm"
+                      rows={6}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-slate-400">
+                      Supports: comma separated, newline separated, or space separated
+                    </div>
+                    <Button 
+                      onClick={bulkImportAccounts} 
+                      className="bg-green-600 hover:bg-green-700"
+                      disabled={!bulkAccountsText.trim()}
+                    >
+                      <Users className="h-4 w-4 mr-2" />
+                      Import {bulkAccountsText.trim().split(/[,\n\r\s]+/).length} Accounts
+                    </Button>
+                  </div>
+                  <div className="text-xs text-green-400 bg-green-900/20 p-3 rounded border border-green-500/30">
+                    💡 This will replace the current 130 accounts with your full 800 @Sploofmeme following list
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Real-time Monitoring Control */}
             <Card className="bg-gradient-to-r from-green-900/30 to-blue-900/30 border-green-500/30 backdrop-blur-sm">
               <CardHeader>
