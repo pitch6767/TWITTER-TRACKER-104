@@ -538,59 +538,6 @@ function TweetTracker() {
 
           {/* Alerts Tab */}
           <TabsContent value="alerts" className="space-y-6">
-            {/* Name Alerts */}
-            <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center text-orange-400">
-                  <AlertTriangle className="h-5 w-5 mr-2" />
-                  Name Alerts ({nameAlerts.length}) • Trending Tokens (No CA Yet)
-                </CardTitle>
-                <CardDescription>
-                  Tokens mentioned by {alertThresholdConfig}+ accounts but haven't gotten contract addresses yet
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4 max-h-96 overflow-y-auto">
-                  {nameAlerts.length > 0 ? nameAlerts.map((alert, index) => (
-                    <div key={alert.id || index} className="p-4 bg-slate-700/50 rounded-lg border-l-4 border-orange-500">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-semibold text-orange-300">{alert.token_name}</h3>
-                        <div className="flex items-center space-x-2">
-                          <Badge variant="outline" className="text-orange-400 border-orange-400">
-                            {alert.quorum_count} mentions
-                          </Badge>
-                          <Badge variant="outline" className="text-blue-400 border-blue-400">
-                            🔍 Watching for CA
-                          </Badge>
-                        </div>
-                      </div>
-                      <div className="text-sm text-slate-400 space-y-2">
-                        <div className="flex items-center">
-                          <Clock className="h-3 w-3 mr-1" />
-                          First seen: {formatTime(alert.first_seen)}
-                        </div>
-                        <div className="text-xs">
-                          <strong>Mentioned by:</strong> {alert.accounts_mentioned?.join(', ')}
-                        </div>
-                        <div className="text-xs text-blue-400 bg-blue-900/20 p-2 rounded border border-blue-500/30">
-                          ⚡ This token is trending! System is watching for contract address launch...
-                        </div>
-                      </div>
-                    </div>
-                  )) : (
-                    <div className="text-center text-slate-500 py-12">
-                      <AlertTriangle className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                      <div className="space-y-2">
-                        <p className="text-lg font-medium">🎯 Waiting for Trending Tokens</p>
-                        <p className="text-sm">Name alerts will appear when {alertThresholdConfig}+ accounts mention the same token</p>
-                        <p className="text-xs text-orange-400">These tokens don't have contract addresses yet - perfect for early detection!</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
             {/* CA Alerts - Full Width Trading Window */}
             <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
               <CardHeader>
