@@ -192,75 +192,127 @@ class RealTimeXMonitor:
             self.is_monitoring = False
 
     async def update_following_list(self, target_account: str):
-        """Update the list of accounts to monitor by scraping X following list"""
+        """Update the list of accounts to monitor by scraping X following list with authentication"""
         try:
             # Initialize browser if needed
             if not self.browser:
                 await self.initialize_browser()
             
             if not self.browser:
-                logger.error("Browser initialization failed, using fallback accounts")
-                await self._use_fallback_accounts()
+                logger.error("Browser initialization failed, using enhanced fallback")
+                await self._use_enhanced_fallback()
                 return
             
-            logger.info(f"Attempting to scrape @{target_account} following list...")
+            logger.info(f"Attempting to scrape @{target_account} following list with authentication...")
             
             try:
-                # Navigate to X profile following page
-                following_url = f"https://x.com/{target_account}/following"
-                await self.page.goto(following_url, wait_until='networkidle', timeout=30000)
-                
-                # Wait for page to load
-                await self.page.wait_for_timeout(3000)
-                
-                # Check if we need to handle login or rate limiting
-                page_content = await self.page.content()
-                if "login" in page_content.lower() or "sign in" in page_content.lower():
-                    logger.warning("X login required - using enhanced meme-focused accounts")
+                # Step 1: Login to X first
+                login_success = await self.login_to_x()
+                if not login_success:
+                    logger.warning("X login failed - using enhanced fallback")
                     await self._use_enhanced_fallback()
                     return
                 
-                # Scroll and collect following accounts
+                # Step 2: Navigate to following page (now authenticated)
+                following_url = f"https://x.com/{target_account}/following"
+                logger.info(f"Navigating to {following_url}")
+                await self.page.goto(following_url, wait_until='networkidle', timeout=30000)
+                
+                # Wait for page to load
+                await self.page.wait_for_timeout(5000)
+                
+                # Step 3: Scroll and collect following accounts
                 accounts = set()
                 scroll_attempts = 0
-                max_scrolls = 20  # Limit scrolling to avoid infinite loop
+                max_scrolls = 50  # Increase scrolls for more accounts
+                no_new_accounts_count = 0
                 
-                while scroll_attempts < max_scrolls and len(accounts) < 1000:
-                    # Look for account links in the current view
-                    account_links = await self.page.query_selector_all('a[href*="/"]')
+                logger.info("Starting to collect following accounts...")
+                
+                while scroll_attempts < max_scrolls and len(accounts) < 2000 and no_new_accounts_count < 5:
+                    previous_count = len(accounts)
                     
-                    for link in account_links:
-                        try:
-                            href = await link.get_attribute('href')
-                            if href and href.startswith('/') and len(href) > 1:
-                                username = href.strip('/').split('/')[0]
-                                if username and len(username) > 0 and not username.startswith('i/'):
-                                    accounts.add(username)
-                        except:
-                            continue
+                    # Look for account links and usernames
+                    try:
+                        # Method 1: Look for profile links
+                        account_links = await self.page.query_selector_all('a[href^="/"][href*="/"]')
+                        
+                        for link in account_links:
+                            try:
+                                href = await link.get_attribute('href')
+                                if href and href.startswith('/') and len(href) > 1:
+                                    username = href.strip('/').split('/')[0]
+                                    if (username and 
+                                        len(username) > 0 and 
+                                        not username.startswith('i/') and
+                                        not username.startswith('intent/') and
+                                        not username.startswith('search') and
+                                        not username.startswith('hashtag') and
+                                        username.replace('_', '').replace('-', '').isalnum() and
+                                        len(username) <= 15):
+                                        accounts.add(username)
+                            except:
+                                continue
+                        
+                        # Method 2: Look for @username text patterns
+                        page_text = await self.page.content()
+                        username_matches = re.findall(r'@([a-zA-Z0-9_]{1,15})', page_text)
+                        for username in username_matches:
+                            if (len(username) > 0 and 
+                                username.replace('_', '').isalnum() and
+                                len(username) <= 15):
+                                accounts.add(username)
+                        
+                    except Exception as e:
+                        logger.debug(f"Error collecting accounts: {e}")
+                    
+                    # Check progress
+                    new_accounts = len(accounts) - previous_count
+                    if new_accounts == 0:
+                        no_new_accounts_count += 1
+                    else:
+                        no_new_accounts_count = 0
+                        logger.info(f"Found {len(accounts)} accounts so far... (+{new_accounts} new)")
                     
                     # Scroll down to load more
                     await self.page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                    await self.page.wait_for_timeout(2000)
+                    await self.page.wait_for_timeout(3000)  # Wait for content to load
                     scroll_attempts += 1
                     
-                    if len(accounts) > scroll_attempts * 10:  # Making progress
-                        logger.info(f"Found {len(accounts)} accounts so far...")
+                    # Log progress every 10 scrolls
+                    if scroll_attempts % 10 == 0:
+                        logger.info(f"Scroll {scroll_attempts}/{max_scrolls}: {len(accounts)} accounts collected")
                 
                 # Filter and clean the accounts list
                 filtered_accounts = []
-                for account in accounts:
-                    if (len(account) > 0 and 
-                        not account.startswith('i/') and 
-                        not account.startswith('intent/') and
-                        not account.startswith('search') and
-                        account.replace('_', '').replace('-', '').isalnum() and
-                        len(account) <= 15):  # X username limit
-                        filtered_accounts.append(account)
+                excluded_terms = {'i', 'intent', 'search', 'hashtag', 'explore', 'settings', 'messages', 
+                               'notifications', 'bookmarks', 'lists', 'profile', 'more', 'compose',
+                               'home', 'moments', 'topics'}
                 
-                if len(filtered_accounts) > 50:  # Good scraping result
-                    self.monitored_accounts = filtered_accounts[:1000]  # Limit to 1000 for performance
-                    logger.info(f"✅ Successfully scraped {len(self.monitored_accounts)} accounts from @{target_account}")
+                for account in accounts:
+                    clean_account = account.lower().strip()
+                    if (len(clean_account) > 0 and 
+                        clean_account not in excluded_terms and
+                        not clean_account.startswith('i/') and 
+                        not clean_account.startswith('intent/') and
+                        not clean_account.startswith('search') and
+                        not clean_account.isdigit() and  # Skip pure numbers
+                        clean_account.replace('_', '').replace('-', '').isalnum() and
+                        len(clean_account) <= 15):  # X username limit
+                        filtered_accounts.append(clean_account)
+                
+                # Remove duplicates and sort
+                filtered_accounts = sorted(list(set(filtered_accounts)))
+                
+                logger.info(f"Collected {len(accounts)} raw accounts, filtered to {len(filtered_accounts)} valid accounts")
+                
+                if len(filtered_accounts) > 100:  # Good scraping result
+                    self.monitored_accounts = filtered_accounts[:1500]  # Limit for performance
+                    logger.info(f"🎉 SUCCESS: Scraped {len(self.monitored_accounts)} real accounts from @{target_account}!")
+                    logger.info(f"Sample accounts: {self.monitored_accounts[:20]}")
+                elif len(filtered_accounts) > 20:  # Partial success
+                    self.monitored_accounts = filtered_accounts
+                    logger.info(f"✅ Partial success: Found {len(self.monitored_accounts)} accounts from @{target_account}")
                 else:
                     logger.warning(f"Only found {len(filtered_accounts)} accounts, using enhanced fallback")
                     await self._use_enhanced_fallback()
@@ -271,7 +323,7 @@ class RealTimeXMonitor:
                 
         except Exception as e:
             logger.error(f"Error updating following list: {e}")
-            await self._use_fallback_accounts()
+            await self._use_enhanced_fallback()
 
     async def _use_fallback_accounts(self):
         """Use basic fallback account list"""
