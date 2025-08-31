@@ -127,6 +127,8 @@ class RealTimeXMonitor:
         except Exception as e:
             logger.error(f"Login error: {e}")
             return False
+
+    async def close_browser(self):
         """Close browser resources"""
         try:
             if self.page:
