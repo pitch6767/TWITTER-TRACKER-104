@@ -882,12 +882,32 @@ async def startup_event():
     """Initialize services on startup"""
     logger.info("Starting Tweet Tracker...")
     
+    # CRITICAL: Auto-restore 130 accounts on every startup
+    try:
+        # Load accounts from database
+        accounts = await db.x_accounts.find({"is_active": True}).to_list(2000)
+        if accounts:
+            account_usernames = [acc['username'] for acc in accounts]
+            real_time_monitor.monitored_accounts = account_usernames
+            logger.info(f"🔄 AUTO-RESTORED {len(account_usernames)} @Sploofmeme accounts on startup")
+            logger.info(f"Sample accounts: {account_usernames[:5]}")
+        else:
+            logger.warning("⚠️ No accounts found in database on startup")
+    except Exception as e:
+        logger.error(f"❌ Failed to auto-restore accounts: {e}")
+    
     # Start Pump.fun WebSocket client in background
     asyncio.create_task(pump_client.connect())
     
-    # Start X account monitoring
+    # Start X account monitoring with restored accounts
     await asyncio.sleep(2)  # Give time for DB to be ready
     await x_monitor.start_monitoring()
+    
+    # FORCE start real-time monitoring with accounts
+    if real_time_monitor.monitored_accounts:
+        real_time_monitor.is_monitoring = True
+        asyncio.create_task(real_time_monitor.monitoring_loop())
+        logger.info(f"✅ FORCED monitoring start with {len(real_time_monitor.monitored_accounts)} accounts")
     
     logger.info("Tweet Tracker started successfully")
 
