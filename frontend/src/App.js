@@ -530,10 +530,6 @@ function TweetTracker() {
               <Activity className="h-4 w-4 mr-2" />
               Performance
             </TabsTrigger>
-            <TabsTrigger value="versions" className="data-[state=active]:bg-purple-600">
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Versions
-            </TabsTrigger>
           </TabsList>
 
           {/* Alerts Tab */}
