@@ -362,33 +362,51 @@ class RealTimeXMonitor:
         logger.info(f"Using fallback: {len(self.monitored_accounts)} accounts")
 
     async def _use_enhanced_fallback(self):
-        """Use enhanced fallback with more meme coin focused accounts"""
+        """Use comprehensive meme-focused account list - often MORE effective than random following"""
         enhanced_accounts = [
-            # Top Crypto Influencers
+            # Tier 1: Major Crypto Influencers (High Signal)
             "elonnmusk", "VitalikButerin", "CZ_Binance", "saylor", "nayibbukele",
             "APompliano", "RaoulGMI", "woonomic", "CryptoCobain", "DegenSpartan",
             
-            # Meme Coin Focused
-            "DogecoinRise", "PepeCoinEth", "ShibInuHolder", "memecoinbuzz", "AltcoinGordon",
-            "pentosh1", "inversebrah", "CryptoMessiah", "JackNiewold", "CryptoWendyO",
+            # Tier 2: Meme Coin Specialists & Alt Coin Experts  
+            "AltcoinGordon", "pentosh1", "inversebrah", "CryptoMessiah", "JackNiewold",
+            "CryptoWendyO", "TraderSZ", "CryptoCow", "TheCryptoLark", "AltcoinDaily",
             
-            # Trading & Analysis
-            "TraderSZ", "CryptoCow", "TheCryptoLark", "AltcoinDaily", "MMCrypto",
-            "IvanOnTech", "aantonop", "VentureCoinist", "MessariCrypto", "lawmaster",
+            # Tier 3: Trading & Technical Analysis
+            "MMCrypto", "IvanOnTech", "aantonop", "VentureCoinist", "MessariCrypto",
+            "lawmaster", "0xHamz", "DefiEdge", "DeFianceCapital", "ChrisBlec",
             
-            # Additional Meme/Alt Focused
-            "0xHamz", "DefiEdge", "DeFianceCapital", "ChrisBlec", "SatoshiStacker",
-            "CryptoBusy", "AltcoinSherpa", "EmperorBTC", "CryptoBull", "mooncat2878",
+            # Tier 4: Solana & Meme Ecosystem (High Priority for Pump.fun)
+            "SatoshiStacker", "CryptoBusy", "AltcoinSherpa", "EmperorBTC", "CryptoBull",
+            "mooncat2878", "SolanaFloor", "MagicEden", "solana", "phantom",
             
-            # More Solana/Meme Ecosystem
-            "SolanaFloor", "MagicEden", "solana", "phantom", "SolanaNews",
-            "sol_master", "SolanianPunks", "SolanaFM", "jupiter_exchange", "raydium",
+            # Tier 5: Meme Coin Focused Accounts
+            "SolanaNews", "sol_master", "SolanianPunks", "SolanaFM", "jupiter_exchange",
+            "raydium", "pumpdotfun", "solana_memes", "meme_factory", "degensol",
             
-            # Pump.fun and Meme Coin Ecosystem
-            "pumpdotfun", "solana_memes", "meme_factory", "degensol", "SolMemeCoins"
+            # Tier 6: Additional High-Signal Accounts
+            "SolMemeCoins", "DogecoinRise", "PepeCoinEth", "ShibInuHolder", "memecoinbuzz",
+            "pepe_memecoin", "doge_updates", "shib_army", "bonk_inu", "wif_coin",
+            
+            # Tier 7: Crypto Twitter Personalities
+            "cryptowendy", "bitboy_crypto", "coin_bureau", "crypt0snews", "cryptobull2020",
+            "altcoinbuzz", "cryptocred", "scottmelker", "CryptoCapo_", "rektcapital",
+            
+            # Tier 8: DeFi & New Projects
+            "defipulse", "zapper_protocol", "uniswap", "1inch", "compoundfinance",
+            "aaveaave", "synthetix_io", "yearnfinance", "sushiswap", "balancer",
+            
+            # Tier 9: Memecoin Influencers & Callers
+            "shibatoken", "dogecoin", "pepecoin", "floki", "babydoge", "kishu_inu",
+            "hokkaido_inu", "dogelon_mars", "samoyedcoin", "catecoin", "hoge_finance"
         ]
+        
         self.monitored_accounts = enhanced_accounts
-        logger.info(f"Using enhanced fallback: {len(self.monitored_accounts)} meme-focused accounts")
+        logger.info(f"🚀 Using enhanced meme-focused monitoring: {len(self.monitored_accounts)} high-signal accounts")
+        logger.info(f"Coverage: Major influencers + Meme specialists + Solana ecosystem + DeFi leaders")
+        logger.info(f"Sample accounts: {self.monitored_accounts[:10]}")
+        
+        return len(self.monitored_accounts)
 
     async def monitoring_loop(self):
         """Main monitoring loop"""
