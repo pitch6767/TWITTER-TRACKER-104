@@ -392,6 +392,22 @@ class RealTimeXMonitor:
             logger.error(f"Error starting monitoring: {e}")
             self.is_monitoring = False
 
+    async def load_accounts_from_database(self):
+        """Load monitored accounts from database"""
+        try:
+            # Get all active tracked accounts from database
+            accounts = await self.db.x_accounts.find({"is_active": True}).to_list(2000)
+            
+            if accounts:
+                self.monitored_accounts = [acc['username'] for acc in accounts]
+                logger.info(f"✅ Loaded {len(self.monitored_accounts)} accounts from database")
+                logger.info(f"Sample accounts: {self.monitored_accounts[:10]}")
+            else:
+                logger.info("No accounts found in database")
+                
+        except Exception as e:
+            logger.error(f"Error loading accounts from database: {e}")
+            self.monitored_accounts = []
     async def update_following_list(self, target_account: str):
         """Get REAL @Sploofmeme following list with authentication"""
         try:
