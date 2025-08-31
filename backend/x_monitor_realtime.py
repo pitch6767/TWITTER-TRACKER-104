@@ -190,46 +190,62 @@ class RealTimeXMonitor:
                     
                     # Check if verification code is needed
                     page_content_after = await self.page.content()
-                    x_verification_code = os.getenv('X_VERIFICATION_CODE')
                     
-                    if (("code" in page_content_after.lower() or 
-                         "verify" in page_content_after.lower() or
-                         "confirmation" in page_content_after.lower()) and 
-                        x_verification_code):
+                    if ("code" in page_content_after.lower() or 
+                        "verify" in page_content_after.lower() or
+                        "confirmation" in page_content_after.lower()):
                         
                         logger.info("🔢 Verification code step detected")
+                        logger.info("📧 Please check your ProtonMail for the verification code")
                         
-                        # Look for verification code input
-                        code_input = None
-                        code_selectors = [
-                            'input[name="text"]',
-                            'input[data-testid="ocfEnterTextTextInput"]',
-                            'input[type="text"]',
-                            'input[placeholder*="code"]',
-                            'input[placeholder*="Code"]'
-                        ]
+                        # Pause here and ask for code from user
+                        print("\n" + "="*60)
+                        print("🔐 X LOGIN: VERIFICATION CODE REQUIRED")
+                        print("📧 Check your ProtonMail inbox: sploofmeme@protonmail.com")
+                        print("🔍 Look for email from X/Twitter with verification code")
+                        print("="*60)
                         
-                        for selector in code_selectors:
-                            try:
-                                code_input = await self.page.wait_for_selector(selector, timeout=3000)
-                                if code_input:
-                                    logger.info("Found verification code input")
-                                    await code_input.fill(x_verification_code)
-                                    logger.info(f"Verification code entered: {x_verification_code}")
+                        # In a real implementation, this would be handled via API call
+                        # For now, we'll need to implement a way to get the code
+                        verification_code = input("Enter the verification code from email: ").strip()
+                        
+                        if verification_code and len(verification_code) >= 6:
+                            logger.info(f"📥 Received verification code: {verification_code}")
+                            
+                            # Look for verification code input
+                            code_input = None
+                            code_selectors = [
+                                'input[name="text"]',
+                                'input[data-testid="ocfEnterTextTextInput"]',
+                                'input[type="text"]',
+                                'input[placeholder*="code"]',
+                                'input[placeholder*="Code"]'
+                            ]
+                            
+                            for selector in code_selectors:
+                                try:
+                                    code_input = await self.page.wait_for_selector(selector, timeout=3000)
+                                    if code_input:
+                                        logger.info("Found verification code input")
+                                        await code_input.fill(verification_code)
+                                        logger.info(f"Verification code entered: {verification_code}")
+                                        break
+                                except:
+                                    continue
+                            
+                            # Click Next after verification code
+                            for selector in next_selectors:
+                                try:
+                                    await self.page.click(selector, timeout=3000)
+                                    logger.info("Clicked Next after verification code")
                                     break
-                            except:
-                                continue
-                        
-                        # Click Next after verification code
-                        for selector in next_selectors:
-                            try:
-                                await self.page.click(selector, timeout=3000)
-                                logger.info("Clicked Next after verification code")
-                                break
-                            except:
-                                continue
-                        
-                        await self.page.wait_for_timeout(3000)
+                                except:
+                                    continue
+                            
+                            await self.page.wait_for_timeout(3000)
+                        else:
+                            logger.error("❌ No verification code provided or invalid format")
+                            return False
                     
             except Exception as e:
                 logger.debug(f"Email/code verification handling: {e}")
