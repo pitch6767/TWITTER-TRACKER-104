@@ -367,21 +367,23 @@ class RealTimeXMonitor:
         return list(tokens)
 
     async def start_monitoring(self, target_account: str = "Sploofmeme"):
-        """Start monitoring all accounts that the target account follows"""
+        """Start monitoring X accounts for token mentions"""
         try:
             if self.is_monitoring:
                 logger.warning("Monitoring already active")
                 return
             
             self.is_monitoring = True
+            logger.info("Starting X account monitoring...")
             
-            # Load known tokens to filter out
-            await self.load_known_tokens_with_ca()
+            # Load accounts from database first
+            await self.load_accounts_from_database()
             
-            # Get following list
-            await self.update_following_list(target_account)
+            # If no accounts in database, get following list
+            if not self.monitored_accounts:
+                await self.update_following_list(target_account)
             
-            logger.info(f"Started monitoring {len(self.monitored_accounts)} accounts followed by @{target_account}")
+            logger.info(f"Monitoring {len(self.monitored_accounts)} X accounts")
             
             # Start monitoring loop
             asyncio.create_task(self.monitoring_loop())
