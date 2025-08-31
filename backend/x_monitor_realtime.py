@@ -130,37 +130,127 @@ class RealTimeXMonitor:
             self.is_monitoring = False
 
     async def update_following_list(self, target_account: str):
-        """Update the list of accounts to monitor"""
+        """Update the list of accounts to monitor by scraping X following list"""
         try:
-            # For demonstration, using a fallback list of popular meme coin accounts
-            # In production, this would scrape the actual following list
-            fallback_accounts = [
-                "elonnmusk", "VitalikButerin", "CZ_Binance", "saylor", "nayibbukele",
-                "APompliano", "RaoulGMI", "woonomic", "CryptoCobain", "DegenSpartan",
-                "DeFianceCapital", "ChrisBlec", "AltcoinGordon", "pentosh1", "inversebrah",
-                "CryptoMessiah", "JackNiewold", "CryptoWendyO", "TraderSZ", "CryptoCow",
-                "TheCryptoLark", "AltcoinDaily", "MMCrypto", "IvanOnTech", "aantonop",
-                "VentureCoinist", "MessariCrypto", "lawmaster", "0xHamz", "DefiEdge"
-            ]
+            # Initialize browser if needed
+            if not self.browser:
+                await self.initialize_browser()
             
-            # Try to get real following data (simplified for demo)
+            if not self.browser:
+                logger.error("Browser initialization failed, using fallback accounts")
+                await self._use_fallback_accounts()
+                return
+            
+            logger.info(f"Attempting to scrape @{target_account} following list...")
+            
             try:
-                # Initialize browser if needed
-                if not self.browser:
-                    await self.initialize_browser()
+                # Navigate to X profile following page
+                following_url = f"https://x.com/{target_account}/following"
+                await self.page.goto(following_url, wait_until='networkidle', timeout=30000)
                 
-                # In a real implementation, this would navigate to X and scrape following
-                # For now, use fallback with some dynamic additions
-                self.monitored_accounts = fallback_accounts[:25]  # Limit for demo
+                # Wait for page to load
+                await self.page.wait_for_timeout(3000)
                 
-                logger.info(f"Updated monitoring list: {len(self.monitored_accounts)} accounts")
+                # Check if we need to handle login or rate limiting
+                page_content = await self.page.content()
+                if "login" in page_content.lower() or "sign in" in page_content.lower():
+                    logger.warning("X login required - using fallback accounts")
+                    await self._use_fallback_accounts()
+                    return
                 
+                # Scroll and collect following accounts
+                accounts = set()
+                scroll_attempts = 0
+                max_scrolls = 20  # Limit scrolling to avoid infinite loop
+                
+                while scroll_attempts < max_scrolls and len(accounts) < 1000:
+                    # Look for account links in the current view
+                    account_links = await self.page.query_selector_all('a[href*="/"]')
+                    
+                    for link in account_links:
+                        try:
+                            href = await link.get_attribute('href')
+                            if href and href.startswith('/') and len(href) > 1:
+                                username = href.strip('/').split('/')[0]
+                                if username and len(username) > 0 and not username.startswith('i/'):
+                                    accounts.add(username)
+                        except:
+                            continue
+                    
+                    # Scroll down to load more
+                    await self.page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                    await self.page.wait_for_timeout(2000)
+                    scroll_attempts += 1
+                    
+                    if len(accounts) > scroll_attempts * 10:  # Making progress
+                        logger.info(f"Found {len(accounts)} accounts so far...")
+                
+                # Filter and clean the accounts list
+                filtered_accounts = []
+                for account in accounts:
+                    if (len(account) > 0 and 
+                        not account.startswith('i/') and 
+                        not account.startswith('intent/') and
+                        not account.startswith('search') and
+                        account.replace('_', '').replace('-', '').isalnum() and
+                        len(account) <= 15):  # X username limit
+                        filtered_accounts.append(account)
+                
+                if len(filtered_accounts) > 50:  # Good scraping result
+                    self.monitored_accounts = filtered_accounts[:1000]  # Limit to 1000 for performance
+                    logger.info(f"✅ Successfully scraped {len(self.monitored_accounts)} accounts from @{target_account}")
+                else:
+                    logger.warning(f"Only found {len(filtered_accounts)} accounts, using enhanced fallback")
+                    await self._use_enhanced_fallback()
+                    
             except Exception as e:
-                logger.error(f"Error getting following list, using fallback: {e}")
-                self.monitored_accounts = fallback_accounts[:15]
+                logger.error(f"Scraping failed: {e}, using fallback accounts")
+                await self._use_enhanced_fallback()
                 
         except Exception as e:
             logger.error(f"Error updating following list: {e}")
+            await self._use_fallback_accounts()
+
+    async def _use_fallback_accounts(self):
+        """Use basic fallback account list"""
+        fallback_accounts = [
+            "elonnmusk", "VitalikButerin", "CZ_Binance", "saylor", "nayibbukele",
+            "APompliano", "RaoulGMI", "woonomic", "CryptoCobain", "DegenSpartan",
+            "DeFianceCapital", "ChrisBlec", "AltcoinGordon", "pentosh1", "inversebrah",
+            "CryptoMessiah", "JackNiewold", "CryptoWendyO", "TraderSZ", "CryptoCow",
+            "TheCryptoLark", "AltcoinDaily", "MMCrypto", "IvanOnTech", "aantonop"
+        ]
+        self.monitored_accounts = fallback_accounts
+        logger.info(f"Using fallback: {len(self.monitored_accounts)} accounts")
+
+    async def _use_enhanced_fallback(self):
+        """Use enhanced fallback with more meme coin focused accounts"""
+        enhanced_accounts = [
+            # Top Crypto Influencers
+            "elonnmusk", "VitalikButerin", "CZ_Binance", "saylor", "nayibbukele",
+            "APompliano", "RaoulGMI", "woonomic", "CryptoCobain", "DegenSpartan",
+            
+            # Meme Coin Focused
+            "DogecoinRise", "PepeCoinEth", "ShibInuHolder", "memecoinbuzz", "AltcoinGordon",
+            "pentosh1", "inversebrah", "CryptoMessiah", "JackNiewold", "CryptoWendyO",
+            
+            # Trading & Analysis
+            "TraderSZ", "CryptoCow", "TheCryptoLark", "AltcoinDaily", "MMCrypto",
+            "IvanOnTech", "aantonop", "VentureCoinist", "MessariCrypto", "lawmaster",
+            
+            # Additional Meme/Alt Focused
+            "0xHamz", "DefiEdge", "DeFianceCapital", "ChrisBlec", "SatoshiStacker",
+            "CryptoBusy", "AltcoinSherpa", "EmperorBTC", "CryptoBull", "mooncat2878",
+            
+            # More Solana/Meme Ecosystem
+            "SolanaFloor", "MagicEden", "solana", "phantom", "SolanaNews",
+            "sol_master", "SolanianPunks", "SolanaFM", "jupiter_exchange", "raydium",
+            
+            # Pump.fun and Meme Coin Ecosystem
+            "pumpdotfun", "solana_memes", "meme_factory", "degensol", "SolMemeCoins"
+        ]
+        self.monitored_accounts = enhanced_accounts
+        logger.info(f"Using enhanced fallback: {len(self.monitored_accounts)} meme-focused accounts")
 
     async def monitoring_loop(self):
         """Main monitoring loop"""
