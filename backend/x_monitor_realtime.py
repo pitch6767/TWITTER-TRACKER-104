@@ -65,7 +65,68 @@ class RealTimeXMonitor:
             logger.error(f"Failed to initialize browser: {e}")
             return False
 
-    async def close_browser(self):
+    async def login_to_x(self):
+        """Login to X/Twitter using credentials"""
+        try:
+            x_username = os.getenv('X_USERNAME')
+            x_password = os.getenv('X_PASSWORD')
+            
+            if not x_username or not x_password:
+                logger.error("X credentials not found in environment variables")
+                return False
+            
+            logger.info("Attempting to login to X...")
+            
+            # Navigate to X login page
+            await self.page.goto('https://x.com/i/flow/login', wait_until='networkidle', timeout=30000)
+            await self.page.wait_for_timeout(3000)
+            
+            # Enter username
+            try:
+                username_input = await self.page.wait_for_selector('input[name="text"]', timeout=10000)
+                await username_input.fill(x_username)
+                await self.page.click('text=Next')
+                await self.page.wait_for_timeout(2000)
+            except Exception as e:
+                logger.error(f"Error entering username: {e}")
+                return False
+            
+            # Handle potential phone/email verification step
+            try:
+                # Check if there's a phone number or email verification step
+                if await self.page.is_visible('text=Enter your phone number or username'):
+                    logger.info("Phone/username verification step detected")
+                    phone_input = await self.page.wait_for_selector('input[name="text"]', timeout=5000)
+                    await phone_input.fill(x_username)
+                    await self.page.click('text=Next')
+                    await self.page.wait_for_timeout(2000)
+            except:
+                pass  # Skip if not present
+            
+            # Enter password
+            try:
+                password_input = await self.page.wait_for_selector('input[name="password"]', timeout=10000)
+                await password_input.fill(x_password)
+                await self.page.click('text=Log in')
+                await self.page.wait_for_timeout(5000)
+            except Exception as e:
+                logger.error(f"Error entering password: {e}")
+                return False
+            
+            # Check if login was successful
+            await self.page.wait_for_timeout(3000)
+            current_url = self.page.url
+            
+            if 'home' in current_url or 'x.com' in current_url and 'login' not in current_url:
+                logger.info("✅ Successfully logged into X!")
+                return True
+            else:
+                logger.error("❌ Login failed - still on login page")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Login error: {e}")
+            return False
         """Close browser resources"""
         try:
             if self.page:
