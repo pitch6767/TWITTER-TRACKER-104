@@ -512,13 +512,61 @@ async def add_tracked_account(account: XAccount):
     tracked_accounts.append(account_dict)
     return account
 
-@api_router.delete("/accounts/{account_id}")
-async def remove_tracked_account(account_id: str):
-    """Remove X account from tracking"""
-    await db.x_accounts.delete_one({"id": account_id})
-    global tracked_accounts
-    tracked_accounts = [acc for acc in tracked_accounts if acc.get('id') != account_id]
-    return {"message": "Account removed successfully"}
+class ManualAccountImport(BaseModel):
+    accounts: List[str]
+    source: str = "manual_import"
+
+@api_router.post("/accounts/import")
+async def import_sploofmeme_accounts(import_data: ManualAccountImport):
+    """Import real @Sploofmeme following accounts manually"""
+    try:
+        global tracked_accounts
+        
+        # Clean and validate usernames
+        clean_accounts = []
+        for account in import_data.accounts:
+            clean_username = account.strip().lower().replace('@', '')
+            if (len(clean_username) > 0 and 
+                clean_username.replace('_', '').replace('-', '').isalnum() and
+                len(clean_username) <= 15):
+                clean_accounts.append(clean_username)
+        
+        # Create account objects
+        imported_accounts = []
+        for username in clean_accounts:
+            account_obj = {
+                "id": str(uuid.uuid4()),
+                "username": username,
+                "display_name": username,
+                "is_active": True,
+                "created_at": datetime.now(timezone.utc),
+                "source": import_data.source
+            }
+            
+            # Store in database
+            await db.x_accounts.insert_one(account_obj)
+            imported_accounts.append(account_obj)
+        
+        # Update tracked accounts
+        tracked_accounts.extend(imported_accounts)
+        
+        # Update real-time monitor if it exists
+        if hasattr(real_time_monitor, 'monitored_accounts'):
+            real_time_monitor.monitored_accounts = clean_accounts
+            logger.info(f"✅ Real-time monitor updated with {len(clean_accounts)} @Sploofmeme accounts")
+        
+        logger.info(f"✅ Imported {len(clean_accounts)} real @Sploofmeme following accounts")
+        
+        return {
+            "message": f"Successfully imported {len(clean_accounts)} @Sploofmeme following accounts",
+            "imported_count": len(clean_accounts),
+            "accounts": clean_accounts[:20],  # Show first 20
+            "total_tracked": len(tracked_accounts)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error importing accounts: {e}")
+        return {"error": str(e)}
 
 @api_router.post("/mentions")
 async def add_token_mention(mention: TokenMention):
